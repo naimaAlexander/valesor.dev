@@ -61,49 +61,34 @@ alloy-logs: {}
 
 # Alloy Configuration for Postgres Exporter and Scraping
 
-extraConfig:
-  # Configure the Postgres exporter
+extraConfig: 
   prometheus:
     exporter:
-      postgres:
-        integrations_postgres_exporter:
-          data_source_names:
-            - "postgresql://localhost:5432/postgres"
-
-  # Configure service discovery and relabeling rules for Prometheus
-  discovery:
-    relabel:
-      integrations_postgres_exporter:
-        targets: ${prometheus.exporter.postgres.integrations_postgres_exporter.targets}
-        rules:
-          - target_label: "instance"
-            replacement: "${constants.hostname}"
-          - target_label: "job"
-            replacement: "integrations/postgres_exporter"
-
-  # Prometheus scrape configuration for the Postgres exporter
-  prometheus:
+      postgres: "integrations_postgres_exporter"
+      config:
+        data_source_names:
+          - "postgresql://localhost:5432/postgres"
+    discovery:
+      relabel:
+        - target_label: "instance"
+          replacement: "constants.hostname"
+        - target_label: "job"
+          replacement: "integrations/postgres_exporter"
     scrape:
-      integrations_postgres_exporter:
-        targets: ${discovery.relabel.integrations_postgres_exporter.output}
-        forward_to: ${prometheus.remote_write.metrics_service.receiver}
-        job_name: "integrations/postgres_exporter"
+      job_name: "integrations/postgres_exporter"
+      targets:
+        - "localhost:9187"
+      forward_to:
+        - "prometheus.remote_write.metrics_service.receiver"
 
-  # Log file configuration for PostgreSQL logs with Loki
-  local:
-    file_match:
-      logs_integrations_postgres_exporter:
-        path_targets:
-          - __address__: "localhost"
-            __path__: "/var/log/postgresql/postgres.log"
-            instance: "${constants.hostname}"
-            job: "integrations/postgres_exporter"
-
-  # Forward the log data to Loki
   loki:
     source:
       file:
-        logs_integrations_postgres_exporter:
-          targets: ${local.file_match.logs_integrations_postgres_exporter.targets}
-          forward_to: ${loki.write.grafana_cloud_loki.receiver}
-
+        name: "logs_integrations_postgres_exporter"
+        path_targets:
+          - __address__: "localhost"
+            __path__: "/var/log/postgresql/postgres.log"
+            instance: "constants.hostname"
+            job: "integrations/postgres_exporter"
+    forward_to:
+      - "loki.write.grafana_cloud_loki.receiver"
